@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <span style="font-size:30px;cursor:pointer" onclick="openNav()">&#9776; Меню</span>
+
+    <style type="text/css">
+        .flex-container {
+            display: flex;
+            padding: 10px 0;
+            margin: 0 auto;
+        }
+
+        .cost-card {
+            border-radius: 25px;
+            border: 3px solid #D6CFD4;
+            padding: 10px;
+            width: auto;
+            height: auto;
+            min-width: 200px;
+            min-height: 50px;
+            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+
+        .button {
+            border-radius: 5px;
+            border: none;
+            text-align: center;
+            font-weight: 400;
+            cursor: pointer;
+            height: 25px;
+            width: 100px;
+            font-size: 15px;
+        }
+
+        .sidenav {
+            height: 100%;
+            width: 0;
+            position: fixed;
+            z-index: 1;
+            top: 0;
+            left: 0;
+            background-color: #111;
+            overflow-x: hidden;
+            transition: 0.5s;
+            padding-top: 60px;
+        }
+
+        .sidenav a {
+            padding: 8px 8px 8px 32px;
+            text-decoration: none;
+            font-size: 25px;
+            color: #818181;
+            display: block;
+            transition: 0.3s;
+        }
+
+        .sidenav a:hover {
+            color: #f1f1f1;
+        }
+
+        .sidenav .closebtn {
+            position: absolute;
+            top: 0;
+            right: 25px;
+            font-size: 36px;
+            margin-left: 50px;
+        }
+
+        #popup-1 {
+	        display: none;
+	        background-color: rgba(0,0,0,0.5);
+	        position: absolute;
+	        height: 100vh;
+	        width: 100%;
+        }
+
+        .popup-content {
+	        position: relative;
+	        align="center";
+	        padding: 20px;
+	        margin: 0 auto;
+	        background-color: white;
+	        border-radius: 25px;
+	        width: 400px;
+	        top: 5vh;
+        }
+
+        table, th, td {
+            border: 1px solid black;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 5px;
+            text-align: left;
+        }
+
+        th {
+            background-color:#E8E8E8
+        }
+
+        p {
+            font-weight: 900;
+            color:#605F60;
+        }
+    </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.0/jquery.min.js"></script>
+    <script type="text/javascript">
+    function estimateCost(id) {
+        $.ajax({
+                type: "POST",
+                url: '{{ 'ajax-estimate-costs/' }}',
+                data: {
+                        order_id: id },
+                success: function callback(response){
+                    var returnedData = JSON.parse(response);
+
+                    $("#order_id").html(id);
+
+                    $("#dv_address_k_car").html(returnedData.dv_address_k_car);
+                    $("#dv_vehicle_type_k_car").html(returnedData.dv_vehicle_type_k_car);
+                    $("#dv_cost_k_car").html(returnedData.dv_cost_k_car);
+
+                    $("#dv_address_k_man").html(returnedData.dv_address_k_man);
+                    $("#dv_vehicle_type_k_man").html(returnedData.dv_vehicle_type_k_man);
+                    $("#dv_cost_k_man").html(returnedData.dv_cost_k_man);
+
+                    $("#dv_address_m_car").html(returnedData.dv_address_m_car);
+                    $("#dv_vehicle_type_m_car").html(returnedData.dv_vehicle_type_m_car);
+                    $("#dv_cost_m_car").html(returnedData.dv_cost_m_car);
+
+                    $("#dv_address_m_man").html(returnedData.dv_address_m_man);
+                    $("#dv_vehicle_type_m_man").html(returnedData.dv_vehicle_type_m_man);
+                    $("#dv_cost_m_man").html(returnedData.dv_cost_m_man);
+
+                    $("#yx_address_k_car").html(returnedData.yx_address_k_car);
+                    $("#yx_vehicle_type_k_car").html(returnedData.yx_vehicle_type_k_car);
+                    $("#yx_cost_k_car").html(returnedData.yx_cost_k_car);
+
+                    $("#yx_address_m_car").html(returnedData.yx_address_m_car);
+                    $("#yx_vehicle_type_m_car").html(returnedData.yx_vehicle_type_m_car);
+                    $("#yx_cost_m_car").html(returnedData.yx_cost_m_car);
+
+                    $("#yx_address_m_man").html(returnedData.yx_address_m_man);
+                    $("#yx_vehicle_type_m_man").html(returnedData.yx_vehicle_type_m_man);
+                    $("#yx_cost_m_man").html(returnedData.yx_cost_m_man);
+
+                    $("#yx_address_k_man").html(returnedData.yx_address_k_man);
+                    $("#yx_vehicle_type_k_man").html(returnedData.yx_vehicle_type_k_man);
+                    $("#yx_cost_k_man").html(returnedData.yx_cost_k_man);
+
+                    alert(response);
+                }
+        });
+    };
+
+    function selectCost(id) {
+        var popup1 = document.getElementById("popup-1");
+        popup1.style.display = "block";
+
+        if (id === 'dv_k_car_div') {
+            $("#delivery_service").html('Достависта');
+            $("#delivery_transport_type").html('Легковой автомобиль');
+            $("#restaurant_address").html('Москва, Ярцевская улица, 19');
+        } else if (id === 'dv_k_man_div') {
+            $("#delivery_service").html('Достависта');
+            $("#delivery_transport_type").html('Пеший курьер');
+            $("#restaurant_address").html('Москва, Ярцевская улица, 19');
+        } else if (id === 'dv_m_car_div') {
+            $("#delivery_service").html('Достависта');
+            $("#delivery_transport_type").html('Легковой автомобиль');
+            $("#restaurant_address").html('Москва, 7-я Кожуховская улица, 9');
+        } else if (id === 'dv_m_man_div') {
+            $("#delivery_service").html('Достависта');
+            $("#delivery_transport_type").html('Пеший курьер');
+            $("#restaurant_address").html('Москва, 7-я Кожуховская улица, 9');
+        } else if (id === 'yx_k_man_div') {
+            $("#delivery_service").html('Яндекс');
+            $("#delivery_transport_type").html('Пеший курьер');
+            $("#restaurant_address").html('Москва, Ярцевская улица, 19');
+        } else if (id === 'yx_m_car_div') {
+            $("#delivery_service").html('Яндекс');
+            $("#delivery_transport_type").html('Легковой автомобиль');
+            $("#restaurant_address").html('Москва, 7-я Кожуховская улица, 9');
+        } else if (id === 'yx_m_man_div') {
+            $("#delivery_service").html('Яндекс');
+            $("#delivery_transport_type").html('Пеший курьер');
+            $("#restaurant_address").html('Москва, 7-я Кожуховская улица, 9');
+        } else if (id === 'yx_k_car_div') {
+            $("#delivery_service").html('Яндекс');
+            $("#delivery_transport_type").html('Легковой автомобиль');
+            $("#restaurant_address").html('Москва, Ярцевская улица, 19');
+        }
+    };
+
+    function makeDeliveryRequest() {
+        var orderId = document.getElementById('order_id').innerHTML;
+        var deliveryService = document.getElementById('delivery_service').innerHTML;
+        var transportType = document.getElementById('delivery_transport_type').innerHTML;
+        var restAddress = document.getElementById('restaurant_address').innerHTML;
+        $.ajax({
+                type: "POST",
+                url: '{{ 'ajax-make-delivery-request/' }}',
+                data: { csrfmiddlewaretoken: '{{ csrf_token }}',
+                        order_id: orderId,
+                        delivery_service: deliveryService,
+                        transport_type: transportType,
+                        rest_address: restAddress},
+                success: function callback(response){
+                    var returnedData = JSON.parse(response);
+                    var trId = orderId + '_status';
+                    var tdColorId = orderId + '_color';
+
+                    var a = document.getElementById(trId);
+                    a.href = returnedData.tracking_url;
+                    a.innerHTML = 'Перейти';
+
+                    var tdColor = document.getElementById(tdColorId);
+                    tdColor.style.backgroundColor = "#FC03E3";
+
+                    closeDeliveryRequest();
+
+                    alert(response);
+                }
+        });
+    };
+
+    function closeDeliveryRequest() {
+        var popup1 = document.getElementById("popup-1");
+        popup1.style.display = "none";
+    };
+
+    function refreshTable() {
+        $.ajax({
+            url: '{{ 'ajax-refresh-orders-table/' }}',
+            success: function callback(response){
+                $("orders_table").empty();
+                //var table = document.getElementById("orders_table");
+                //table.empty();
+            }
+        });
+    };
+
+    function openNav() {
+        document.getElementById("mySidenav").style.width = "250px";
+    };
+
+    function closeNav() {
+        document.getElementById("mySidenav").style.width = "0";
+    };
+
+    $(document).ready(function(){
+        //setInterval('refreshTable()',10000);
+    });
+    </script>
+
+</head>
+<body>
+
+<div id="mySidenav" class="sidenav">
+  <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+  <a href="{% url 'tomilovSite' %}">Заказы</a>
+  <a href="{% url 'tomilovSiteHistory' %}">История</a>
+</div>
+
+<div id="popup-1">
+	<div class="popup-content">
+		<h1>Оформление доставки</h1>
+        <p id="delivery_service"></p>
+        <p id="delivery_transport_type"></p>
+        <p id="restaurant_address"></p>
+        <div class="flex-container">
+		    <button id="close-popup-1" class="button" onclick="closeDeliveryRequest()">Отмена</button>
+            <button id="arrange-order" class="button" onclick="makeDeliveryRequest()">Оформить</button>
+        </div>
+	</div>
+</div>
+
+<div class="flex-container">
+    <p>Оцениваемый заказ: </p>
+    <p id="order_id"></p>
+</div>
+<p>Достависта</p>
+<div class="flex-container">
+    <div id="dv_k_car_div" class="cost-card" onclick="selectCost(this.id)">
+        <p id="dv_address_k_car"></p>
+        <p id="dv_vehicle_type_k_car"></p>
+        <p id="dv_cost_k_car"></p>
+    </div>
+    <div id="dv_k_man_div" class="cost-card" onclick="selectCost(this.id)">
+        <p id="dv_address_k_man"></p>
+        <p id="dv_vehicle_type_k_man"></p>
+        <p id="dv_cost_k_man"></p>
+    </div>
+    <div id="dv_m_car_div" class="cost-card" onclick="selectCost(this.id)">
+        <p id="dv_address_m_car"></p>
+        <p id="dv_vehicle_type_m_car"></p>
+        <p id="dv_cost_m_car"></p>
+    </div>
+    <div id="dv_m_man_div" class="cost-card" onclick="selectCost(this.id)">
+        <p id="dv_address_m_man"></p>
+        <p id="dv_vehicle_type_m_man"></p>
+        <p id="dv_cost_m_man"></p>
+    </div>
+</div>
+
+<p>Яндекс</p>
+<div class="flex-container">
+    <div id="yx_k_car_div" class="cost-card" onclick="selectCost(this.id)">
+        <p id="yx_address_k_car"></p>
+        <p id="yx_vehicle_type_k_car"></p>
+        <p id="yx_cost_k_car"></p>
+    </div>
+    <div id="yx_k_man_div" class="cost-card" onclick="selectCost(this.id)">
+        <p id="yx_address_k_man"></p>
+        <p id="yx_vehicle_type_k_man"></p>
+        <p id="yx_cost_k_man"></p>
+    </div>
+    <div id="yx_m_car_div" class="cost-card" onclick="selectCost(this.id)">
+        <p id="yx_address_m_car"></p>
+        <p id="yx_vehicle_type_m_car"></p>
+        <p id="yx_cost_m_car"></p>
+    </div>
+    <div id="yx_m_man_div" class="cost-card" onclick="selectCost(this.id)">
+        <p id="yx_address_m_man"></p>
+        <p id="yx_vehicle_type_m_man"></p>
+        <p id="yx_cost_m_man"></p>
+    </div>
+</div>
+
+<p></p>
+
+<table style="width:100%;" id="orders_table">
+    <tr>
+        <th>Канал</th>
+        <th>Номер заказа</th>
+        <th>Адрес клиента</th>
+        <th>Сумма</th>
+        <th>Клиент</th>
+        <th></th>
+        <th>Статус</th>
+        <th>Курьер</th>
+    </tr>
+    {% for block in blocks %}
+    <tr>
+        <td>{{ block.channel }}<br>{{ block.rest_address }}</td>
+        <td><a href="{{ block.urlID }}" target="_blank">{{ block.id }}</a></td>
+        <td>{{ block.client_address }}</td>
+        <td>{{ block.total }}</td>
+        <td>{{ block.client }}</td>
+        <td><input id="{{ block.id }}" class="button" onclick="estimateCost(this.id)" name="update_log" type="button" value="Рассчитать"/></td>
+        <td id="{{ block.id|add:'_color'}}">{{ block.status }}</td>
+        <td>
+            <a id="{{ block.id|add:'_status'}}" target="_blank"></a>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+</body>
+</html>
