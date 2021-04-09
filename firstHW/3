@@ -1,0 +1,260 @@
+import json
+import requests
+import csv
+import pandas as pd
+import re
+import random
+from requests.structures import CaseInsensitiveDict
+from geopy.geocoders import Nominatim
+from requests.structures import CaseInsensitiveDict
+from . import databaseScripts as ds
+
+def estimateDeliveryCost(orderId):
+    clientAddress = ds.getOrderInfo(orderId)[5]
+
+    final_dict = __estimateDostavistaCost(clientAddress, orderId)
+    yx_dict = __estimateYandexGoCost(clientAddress, orderId)
+    final_dict.update(yx_dict)
+
+    return json.dumps(final_dict)
+
+def __estimateYandexGoCost(сlientAddress, orderId):
+    headers = CaseInsensitiveDict()
+    headers["Accept"] = "application/json"
+    headers["Accept-Language"] = "*"
+
+    dict_final = {}
+
+    clientCoord = ds.getClientCoordinates(orderId)
+
+    try:
+        clientLocation = geolocator.geocode(сlientAddress)'''
+        for rest_addr in restaurantAddresses:
+            if rest_addr == restaurantAddresses[0]:
+                rCoord = restaurantCoordinates[0]
+            if rest_addr == restaurantAddresses[1]:
+                rCoord = restaurantCoordinates[1]
+            for yVType in yVehicleTypes:
+                data = {'items': [{'quantity': 1,
+                                    'size': {'height': 0.3,
+                                            'length': 0.3,
+                                            'width': 0.3},
+                                    'weight': 5}],
+                        'requirements': {'taxi_class': yVType[0]},
+                        'route_points': [{'coordinates': [float(rCoord[0]), float(rCoord[1])]},
+                                        {'coordinates': [float(clientCoord[0]), float(clientCoord[1])]}],
+                        'skip_door_to_door': False,
+                        }
+
+                x = requests.post(url, headers=headers, json=data)
+                text = json.loads(x.text)
+
+                id = ''
+
+                if rest_addr == restaurantAddresses[0] and yVType[0] == 'express':
+                    id = '_k_car'
+                if rest_addr == restaurantAddresses[0] and yVType[0] == 'courier':
+                    id = '_k_man'
+                if rest_addr == restaurantAddresses[1] and yVType[0] == 'express':
+                    id = '_m_car'
+                if rest_addr == restaurantAddresses[1] and yVType[0] == 'courier':
+                    id = '_m_man'
+
+                info = {'yx_address' + id: rest_addr,
+                        'yx_vehicle_type' + id: yVType[1],
+                        'yx_cost' + id: text['price']}
+                dict_final.update(info)
+    except:
+        dict_final = {'yx_address_k_car': '', 'yx_vehicle_type_k_car': '', 'yx_cost_k_car': '',
+                      'yx_address_k_man': '', 'yx_vehicle_type_k_man': '', 'yx_cost_k_man': '',
+                      'yx_address_m_car': '', 'yx_vehicle_type_m_car': '', 'yx_cost_m_car': '',
+                      'yx_address_m_man': '', 'yx_vehicle_type_m_man': '', 'yx_cost_m_man': ''}
+
+    return dict_final
+
+def __estimateDostavistaCost(clientAddress, orderId):
+
+    dict_final = {}
+    coordinates = []
+
+    for rest_addr in restaurantAddresses:
+        for vType in vehicleTypes:
+            orderData = {'matter': 'Выпечка',
+                         'vehicle_type_id': vType[0],
+                         'loaders_count': 1,
+                         'total_weight_kg': 5,
+                         'payment_method': 'non_cash',
+                         'points': [{'address': rest_addr},
+                                    {'address': clientAddress}]}
+
+            x = requests.post(url,
+                              json=orderData)
+
+            text = json.loads(x.text)
+            cost = text["order"]["payment_amount"]
+
+            id = ''
+
+            if rest_addr == restaurantAddresses[0] and vType[0] == 7:
+                id = '_k_car'
+            if rest_addr == restaurantAddresses[0] and vType[0] == 6:
+                id = '_k_man'
+            if rest_addr == restaurantAddresses[1] and vType[0] == 7:
+                id = '_m_car'
+            if rest_addr == restaurantAddresses[1] and vType[0] == 6:
+                id = '_m_man'
+
+            info = {'dv_address' + id: rest_addr,
+                    'dv_vehicle_type' + id: vType[1],
+                    'dv_cost' + id: cost}
+            dict_final.update(info)
+
+    df = pd.read_csv("actualOrders.csv", delimiter=';', header=None)
+    pos = list(df.iloc[:, 1]).index(orderId)
+    df.iloc[pos, 8] = text["order"]["points"][1]["longitude"]
+    df.iloc[pos, 9] = text["order"]["points"][1]["latitude"]
+    df.to_csv("actualOrders.csv", index=None, header=None, sep=';')
+
+    return dict_final
+
+def createDostavistaOrder(orderId, restAddress, transportType):
+
+    clientAddress = ''
+    with open('actualOrders.csv', newline='') as file:
+        reader = csv.reader(file, delimiter=";")
+        for row in reader:
+            if row[1] == orderId:
+                clientAddress = row[5]
+                client_info = row[4]
+                break
+
+    plus_index = client_info.index("+")
+    clientPhoneNumber = client_info[plus_index+1:plus_index+16].replace(" ", "")
+
+    if restAddress == restaurantAddresses[0]:
+        restaurantNote = notes[0]
+    else:
+        restaurantNote = notes[1]
+
+    if transportType == 'Легковой автомобиль':
+        transportTypeNumber = 7
+    if transportType == 'Пеший курьер':
+        transportTypeNumber = 6
+    orderData = {'matter': 'Выпечка',
+                 'vehicle_type_id': transportTypeNumber,
+                 'loaders_count': 1,
+                 'total_weight_kg': 5,
+                 'payment_method': 'non_cash',
+                 'points': [{'address': restAddress,
+                             'note': restaurantNote},
+                            {'address': clientAddress,
+                             'contact_person': {'phone': clientPhoneNumber}}]}
+
+    x = requests.post(url,
+                      json=orderData)
+    text = json.loads(x.text)
+    tracking_url = text["order"]["points"][0]["tracking_url"]
+    info = {'tracking_url': tracking_url}
+
+    return json.dumps(info)
+
+def createYandexOrder(orderId, restAddress, transportType):
+    clientAddress = ''
+    with open('actualOrders.csv', newline='') as file:
+        reader = csv.reader(file, delimiter=";")
+        for row in reader:
+            if row[1] == orderId:
+                clientAddress = row[5]
+                client_info = row[4]
+                cost = row[3]
+                break
+
+    costNum = re.findall(r'\d+', str(cost))
+    plus_index = client_info.index("+")
+    clientPhoneNumber = client_info[plus_index:plus_index + 16].replace(" ", "")
+
+    clientName = client_info.split(" ")[0]
+
+    if restAddress == restaurantAddresses[0]:
+        restaurantNote = notes[0]
+        restCoord = restaurantCoordinates[0]
+    else:
+        restaurantNote = notes[1]
+        restCoord = restaurantCoordinates[1]
+
+    if transportType == 'Легковой автомобиль':
+        transportTypeNumber = "express"
+    if transportType == 'Пеший курьер':
+        transportTypeNumber = "courier"
+
+    clientLocation = geolocator.geocode(clientAddress)
+
+    data = {
+        "callback_properties": {
+            "callback_url": "https://www.example.com"
+        },
+        "client_requirements": {
+            "taxi_class": transportTypeNumber
+        },
+        "comment": "Домофон не работает",
+        "items": [
+            {
+                "cost_currency": "RUB",
+                "cost_value": str(costNum[0]),
+                "quantity": 1,
+                "size": {
+                    "height": 0.3,
+                    "length": 0.3,
+                    "width": 0.3
+                },
+                "title": "Выпечка",
+                "weight": 5
+            }
+        ],
+        "route_points": {
+            "destination": {
+                "address": {
+                    "comment": "",
+                    "coordinates": [clientLocation.longitude, clientLocation.latitude],
+                    "fullname": clientAddress
+                },
+                "contact": {
+                    "name": "Евгений",
+                },
+            },
+
+            "source": {
+                "address": {
+                    "comment": restaurantNote,
+                    "coordinates": [restCoord[0], restCoord[1]],
+                    "fullname": restAddress
+                },
+                "contact": {
+                    "name": clientName,
+                    "phone": clientPhoneNumber
+                },
+            }
+        },
+    }
+
+    headers = CaseInsensitiveDict()
+    headers["Accept"] = "application/json"
+    headers["Accept-Language"] = "*"
+
+    try:
+        x = requests.post(url, headers=headers, json=data)
+        text = json.loads(x.text)
+        print(text)
+    except requests.exceptions.HTTPError as e:
+        print(x.status_code)
+        print(e.response.text)
+
+import string
+
+def __getRandomString(letters_count, digits_count):
+    letters = ''.join((random.choice(string.ascii_letters) for i in range(letters_count)))
+    digits = ''.join((random.choice(string.digits) for i in range(digits_count)))
+    sample_list = list(letters + digits)
+    random.shuffle(sample_list)
+    final_string = ''.join(sample_list)
+    return final_string
