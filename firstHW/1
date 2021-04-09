@@ -1,0 +1,555 @@
+from bs4 import BeautifulSoup
+import selenium
+from selenium.webdriver import Chrome
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.options import Options
+import time
+import json
+import pandas as pd
+import csv
+from multiprocessing.pool import ThreadPool
+from apscheduler.schedulers.background import BackgroundScheduler
+from . import databaseScripts as ds
+
+yandexURL = ''
+deliveryURL = ''
+
+def scrapInfo():
+    info = []
+    pool = ThreadPool(processes=2)
+
+    async_result1 = pool.apply_async(__yandexFoodScrap, ())
+    async_result2 = pool.apply_async(__yandexFoodScrap, ())
+    async_result3 = pool.apply_async(__mBronScrap, ())
+
+    async_result4 = pool.apply_async(__deliveryClubScrap, ())
+    async_result5 = pool.apply_async(__deliveryClubScrap, ())
+
+    info += async_result1.get()
+    info += async_result2.get()
+
+    info += async_result3.get()
+
+    info += async_result4.get()
+    info += async_result5.get()
+
+    return info
+
+def __yandexFoodScrap(url, login, password, restaurantName):
+    driver = __setChromeDriver()
+    driver.get(url)
+    driver.implicitly_wait(10)
+    time.sleep(2)
+    # login part
+    driver.find_element_by_name('email').send_keys(login)
+    driver.find_element_by_name('password').send_keys(password)
+    driver.find_element_by_class_name(
+        'MuiButtonBase-root.MuiButton-root.jss34.jss33.jss22.MuiButton-contained.jss38.MuiButton-disableElevation').click()
+
+    # elements finding
+    items = driver.find_elements_by_tag_name("li")
+    info = []
+
+    with open('actualOrders.csv', 'a', newline='') as file:
+        writer = csv.writer(file, delimiter=";")
+        for item in items:
+            item.click()
+            time.sleep(3)
+            html = driver.page_source
+            soup = BeautifulSoup(html, 'html.parser')
+
+            label = ''
+            info1 = {'channel': '',
+                     'id': '',
+                     'urlID': '',
+                     'total': '',
+                     'client': '',
+                     'client_address': '',
+                     'Entrance': '',
+                     'Intercom': '',
+                     'Floor': '',
+                     'Flat': '',
+                     'status': '',
+                     'rest_address': restaurantName,
+                     'lat': None,
+                     'long': None
+                     }
+
+            urlID = driver.current_url
+            info1['id'] = urlID.split('/')[-1]
+            info1['urlID'] = urlID
+
+            result = soup.find_all("div")
+            for res in result:
+                if not res.find('div'):
+                    if label == 'Итого:':
+                        info1['total'] = res.text
+                        label = ''
+                    if label == 'Клиент:':
+                        info1['client'] = res.text
+                        label = ''
+                    if label == 'Адрес клиента:':
+                        info1['client_address'] = res.text
+                        label = ''
+                    if label == 'Подъезд:':
+                        info1['Entrance'] = res.text
+                        label = ''
+                    if label == 'Домофон:':
+                        info1['Intercom'] = res.text
+                        label = ''
+                    if label == 'Этаж:':
+                        info1['Floor'] = res.text
+                        label = ''
+                    if label == 'Кв/офис:':
+                        info1['Flat'] = res.text
+                        label = ''
+                    if res.text == 'Завершен' or res.text == 'Новый' or \
+                            res.text == 'В работе' or res.text == 'В доставке':
+                        info1['status'] = res.text
+                    if res.text == 'Итого:' or \
+                            res.text == 'Клиент:' or \
+                            res.text == 'Адрес клиента:' or \
+                            res.text == 'Подъезд:' or \
+                            res.text == 'Домофон:' or \
+                            res.text == 'Этаж:' or \
+                            res.text == 'Кв/офис:':
+                        label = res.text
+            info1['channel'] = 'Яндекс'
+            if info1['client_address'] == '':
+                info1['client_address'] = 'Доставка Яндекса'
+            writer.writerow([info1['channel'], info1['id'], info1['urlID'],
+                             info1['total'], info1['client'], info1['client_address'],
+                             info1['Entrance'], info1['Intercom'], info1['Floor'], info1['Flat'],
+                             info1['status'], info1['rest_address'], info1['lat'], info1['long']])
+            info.append(info1)
+
+    driver.quit()
+    return info
+
+def __deliveryClubScrap(url, login, password, restaurantName):
+    driver = __setChromeDriver()
+    driver.get(url)
+    driver.implicitly_wait(10)
+    time.sleep(1)
+    # login part
+    driver.find_element_by_id('username').send_keys(login)
+    driver.find_element_by_id('password').send_keys(password)
+    driver.find_element_by_id('submit_login').click()
+
+    time.sleep(1)
+    driver.get()
+    time.sleep(3)
+    # elements finding
+    items = driver.find_elements_by_class_name("order-card.ng-scope")
+    info = []
+
+    with open('actualOrders.csv', 'a', newline='') as file:
+        writer = csv.writer(file, delimiter=";")
+        for item in items:
+            driver.execute_script("return arguments[0].scrollIntoView(true);", item)
+            item.click()
+            time.sleep(3)
+            html = driver.page_source
+            soup = BeautifulSoup(html, 'html.parser')
+
+            info1 = {'channel': '',
+                     'id': '',
+                     'urlID': '',
+                     'total': '',
+                     'client': '',
+                     'client_address': '',
+                     'Entrance': '',
+                     'Intercom': '',
+                     'Floor': '',
+                     'Flat': '',
+                     'status': '',
+                     'rest_address': restaurantName,
+                     'lat': None,
+                     'long': None
+            }
+
+            info1['urlID'] = driver.current_url
+            info1['channel'] = 'Деливери'
+
+            deliveryInfo = soup.find_all("div", class_="order-content__delivery-time")[0].text
+            deliveryType = deliveryInfo[15:]
+            info1['client_address'] = deliveryType
+
+            clientDivId = 0
+
+            if deliveryType == "Доставка Delivery Club":
+                courierInfoDiv = soup.find_all("div", class_="order-content__client ng-scope")[0]
+                courierInfo = courierInfoDiv.find('div', class_='order-content__client-value')
+                courierName = courierInfo.find('span', class_='ng-binding').text
+                courierPhone = courierInfo.find('span', class_='customer-telephone ng-binding').text
+                clientDivId = 1
+
+            clientInfoDiv = soup.find_all("div", class_="order-content__client-value")[clientDivId]
+            clientName = clientInfoDiv.find('span', class_='ng-binding').text
+            clientPhone = clientInfoDiv.find('span', class_='customer-telephone ng-binding').text
+            info1['client'] = clientName
+
+            costInfoDiv = soup.find_all("div", class_="order-content__order-price-total-value")[0]
+            costAmount = costInfoDiv.find('span', class_='ng-binding').text
+            info1['total'] = costAmount
+
+            writer.writerow([info1['channel'], info1['id'], info1['urlID'],
+                             info1['total'], info1['client'], info1['client_address'],
+                             info1['Entrance'], info1['Intercom'], info1['Floor'], info1['Flat'],
+                             info1['status'], info1['rest_address'], info1['lat'], info1['long']])
+            info.append(info1)
+
+            time.sleep(1)
+
+    driver.quit()
+    return info
+
+def __mBronScrap():
+    url = 'https://m-bron.ru/cabinet/orders'
+
+    driver = __setChromeDriver()
+
+    driver.get(url)
+    time.sleep(1)
+    # login part
+    driver.find_element_by_name('key1').send_keys()
+    driver.find_element_by_name('key2').send_keys()
+    driver.find_element_by_id('loginBtn').click()
+
+    time.sleep(3)
+    html = driver.page_source
+
+    driver.find_element_by_id('export_btns_dropdown').click()
+
+    driver.find_element_by_class_name('buttons-csv.buttons-html5').click()
+
+    time.sleep(5)
+    info = []
+
+    data = pd.read_csv("./Заказы - Система «M-Bron».csv", sep=';')
+    with open('actualOrders.csv', 'a', newline='') as file:
+        writer = csv.writer(file, delimiter=";")
+        for index, row in data.iterrows():
+            address = row['Город:'] + ', ' + row['Улица:'] + ', ' + str(row['Дом:'])
+            info1 = {'channel': 'M-Bron',
+                     'id': row['№ заказа'],
+                     'urlID': 'https://m-bron.ru/cabinet/orders',
+                     'total': row['Сумма (руб.)'],
+                     'client': row['Клиент'],
+                     'client_address': address,
+                     'status': '',
+                     'Entrance': '',
+                     'Intercom': '',
+                     'Floor': '',
+                     'Flat': '',
+                     'rest_address': '',
+                     'lat': None,
+                     'long': None
+                     }
+            info.append(info1)
+            writer.writerow([info1['channel'], info1['id'], info1['urlID'],
+                             info1['total'], info1['client'], info1['client_address'],
+                             info1['Entrance'], info1['Intercom'], info1['Floor'], info1['Flat'],
+                             info1['status'], info1['rest_address'], info1['lat'], info1['long']])
+
+    driver.quit()
+    return info
+
+def scheduleYandexScrap():
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(schedule, 'interval', seconds=300)
+    scheduler.start()
+
+def scheduleHistoryScrap():
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(schedule1, 'interval', seconds=420)
+    scheduler.start()
+
+def schedule1():
+    ds.cleanHistoryOrders()
+    getHistoryNewWay()
+
+def schedule():
+    info = []
+    pool = ThreadPool(processes=3)
+
+    async_result1 = pool.apply_async(__yandexFoodScrap1,
+                                     )
+    async_result2 = pool.apply_async(__yandexFoodScrap1)
+    async_result3 = pool.apply_async(__mBronScrap1, ())
+
+    info += async_result1.get()
+    info += async_result2.get()
+
+    info += async_result3.get()
+
+    #get ids from sites
+    actualInfoOrders = []
+    for inf in info:
+        actualInfoOrders.append(inf['id'])
+
+    #get ids from database
+    oldInfo = ds.getActualOrders()
+    oldlInfoOrders = []
+    for inf in oldInfo:
+        oldlInfoOrders.append(inf['id'])
+
+    #find orders ids to delete
+    deletedDifference = set(oldlInfoOrders) - set(actualInfoOrders)
+    deletedOrders = list(deletedDifference)
+
+    #find order ids to add
+    addedDifference = set(actualInfoOrders) - set(oldlInfoOrders)
+    addedOrders = list(addedDifference)
+
+    finalInfo = []
+
+    # forming final actual info
+    for order in oldInfo:
+        if not (order['id'] in deletedOrders):
+            # updating order statuses
+            for newOrder in info:
+                if newOrder['id'] == order['id']:
+                    order['status'] = newOrder['status']
+                    break
+            finalInfo.append(order)
+
+    for order in info:
+        if order['id'] in addedOrders:
+            finalInfo.append(order)
+
+    fileVariable = open('actualOrders.csv', 'r+')
+    fileVariable.truncate(0)
+    fileVariable.close()
+    with open('actualOrders.csv', 'a', newline='') as file:
+        writer = csv.writer(file, delimiter=";")
+        for info1 in finalInfo:
+            writer.writerow([info1['channel'], info1['id'], info1['urlID'],
+                             info1['total'], info1['client'], info1['client_address'],
+                             info1['Entrance'], info1['Intercom'], info1['Floor'], info1['Flat'],
+                             info1['status'], info1['rest_address'], info1['lat'], info1['long']])
+
+    print(finalInfo)
+    print('updated by schedule')
+
+
+
+def __yandexFoodScrap1(url, login, password, restaurantName):
+    driver = __setChromeDriver()
+    driver.get(url)
+    driver.implicitly_wait(10)
+    time.sleep(2)
+    # login part
+    driver.find_element_by_name('email').send_keys(login)
+    driver.find_element_by_name('password').send_keys(password)
+    driver.find_element_by_class_name(
+        'MuiButtonBase-root.MuiButton-root.jss34.jss33.jss22.MuiButton-contained.jss38.MuiButton-disableElevation').click()
+
+    # elements finding
+    items = driver.find_elements_by_tag_name("li")
+    info = []
+
+    for item in items:
+        item.click()
+        time.sleep(3)
+        html = driver.page_source
+        soup = BeautifulSoup(html, 'html.parser')
+
+        label = ''
+        info1 = {'channel': '',
+                 'id': '',
+                 'urlID': '',
+                 'total': '',
+                 'client': '',
+                 'client_address': '',
+                 'Entrance': '',
+                 'Intercom': '',
+                 'Floor': '',
+                 'Flat': '',
+                 'status': '',
+                 'rest_address': restaurantName,
+                 'lat': None,
+                 'long': None
+                 }
+
+        urlID = driver.current_url
+        info1['id'] = urlID.split('/')[-1]
+        info1['urlID'] = urlID
+
+        result = soup.find_all("div")
+        for res in result:
+            if not res.find('div'):
+                if label == 'Итого:':
+                    info1['total'] = res.text
+                    label = ''
+                if label == 'Клиент:':
+                    info1['client'] = res.text
+                    label = ''
+                if label == 'Адрес клиента:':
+                    info1['client_address'] = res.text
+                    label = ''
+                if label == 'Подъезд:':
+                    info1['Entrance'] = res.text
+                    label = ''
+                if label == 'Домофон:':
+                    info1['Intercom'] = res.text
+                    label = ''
+                if label == 'Этаж:':
+                    info1['Floor'] = res.text
+                    label = ''
+                if label == 'Кв/офис:':
+                    info1['Flat'] = res.text
+                    label = ''
+                if res.text == 'Завершен' or res.text == 'Новый' or \
+                        res.text == 'В работе' or res.text == 'В доставке':
+                    info1['status'] = res.text
+                if res.text == 'Итого:' or \
+                        res.text == 'Клиент:' or \
+                        res.text == 'Адрес клиента:' or \
+                        res.text == 'Подъезд:' or \
+                        res.text == 'Домофон:' or \
+                        res.text == 'Этаж:' or \
+                        res.text == 'Кв/офис:':
+                        label = res.text
+        info1['channel'] = 'Яндекс'
+        if info1['client_address'] == '':
+            info1['client_address'] = 'Доставка Яндекса'
+        info.append(info1)
+
+    driver.quit()
+    return info
+
+def __mBronScrap1():
+    url = 'https://m-bron.ru/cabinet/orders'
+
+    driver = __setChromeDriver()
+
+    driver.get(url)
+    time.sleep(1)
+    # login part
+    driver.find_element_by_name('key1').send_keys()
+    driver.find_element_by_name('key2').send_keys()
+    driver.find_element_by_id('loginBtn').click()
+
+    time.sleep(3)
+    html = driver.page_source
+
+    driver.find_element_by_id('export_btns_dropdown').click()
+
+    driver.find_element_by_class_name('buttons-csv.buttons-html5').click()
+
+    time.sleep(5)
+    info = []
+
+    data = pd.read_csv("./Заказы - Система «M-Bron».csv", sep=';')
+    for index, row in data.iterrows():
+        address = row['Город:'] + ', ' + row['Улица:'] + ', ' + str(row['Дом:'])
+        info1 = {'channel': 'M-Bron',
+                    'id': row['№ заказа'],
+                    'urlID': 'https://m-bron.ru/cabinet/orders',
+                    'total': row['Сумма (руб.)'],
+                    'client': row['Клиент'],
+                    'client_address': address,
+                    'status': '',
+                    'Entrance': '',
+                    'Intercom': '',
+                    'Floor': '',
+                    'Flat': '',
+                    'rest_address': '',
+                    'lat': None,
+                    'long': None
+                }
+        info.append(info1)
+
+    driver.quit()
+    return info
+
+from datetime import datetime, timedelta
+
+def getHistoryNewWay():
+    driver = __setChromeDriver()
+
+    i = 0
+    driver.implicitly_wait(5)
+    # login part
+    driver.find_element_by_name('email').send_keys()
+    driver.find_element_by_name('password').send_keys()
+    driver.find_element_by_class_name(
+        'MuiButtonBase-root.MuiButton-root.jss34.jss33.jss22.MuiButton-contained.jss38.MuiButton-disableElevation').click()
+
+    time.sleep(3)
+    while i <= 7:
+        print(datetime.today().weekday())
+        day = datetime.now() - timedelta(days=i)
+        date =str(day.year) + "-" + str(day.month) + "-" + str(day.day)
+        print(date)
+
+        driver.get('https://vendor.eda.yandex/history/?dateFrom=' + date + '&dateTo=' + date)
+        time.sleep(3)
+        items = driver.find_elements_by_tag_name("li")
+        print(len(items))
+        info = []
+
+        with open('history.csv', 'a', newline='') as file:
+            writer = csv.writer(file, delimiter=";")
+
+            for item in items:
+                item.click()
+                driver.execute_script("return arguments[0].scrollIntoView(true);", item)
+                time.sleep(2)
+                html = driver.page_source
+                urlID = driver.current_url
+                soup = BeautifulSoup(html, 'html.parser')
+
+                label = ''
+                info1 = {'channel': '',
+                         'id': '',
+                         'urlID': '',
+                         'total': '',
+                         'client': '',
+                         'client_address': '',
+                         'status': ''}
+
+                urlID = driver.current_url
+                info1['id'] = urlID[-6:]
+                info1['urlID'] = urlID
+
+                result = soup.find_all("div")
+                for res in result:
+                    if not res.find('div'):
+                        if label == 'Итого:':
+                            info1['total'] = res.text
+                            label = ''
+                        if label == 'Клиент:':
+                            info1['client'] = res.text
+                            label = ''
+                        if label == 'Адрес клиента:':
+                            info1['client_address'] = res.text
+                            label = ''
+                        if res.text == 'Завершен':
+                            info1['status'] = res.text
+                        if res.text == 'Итого:' or \
+                                res.text == 'Клиент:' or \
+                                res.text == 'Адрес клиента:':
+                            label = res.text
+                info1['channel'] = 'Яндекс'
+                if info1['client_address'] == '':
+                    info1['client_address'] = 'Доставка Яндекса'
+                writer.writerow([info1['channel'], info1['id'], info1['urlID'],
+                                 info1['total'], info1['client'], info1['client_address'],
+                                 info1['status'], date])
+                info.append(info1)
+        i += 1
+
+def __setChromeDriver():
+    headers = {
+       
+    }
+
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--window-size=1920,1200")
+
+    driver = Chrome()  # Chrome(ChromeDriverManager().install())
+    driver.header_overrides = headers
+    return driver
