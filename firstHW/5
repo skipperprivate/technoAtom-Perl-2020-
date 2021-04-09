@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style type="text/css">
+        .sidenav {
+            height: 100%;
+            width: 0;
+            position: fixed;
+            z-index: 1;
+            top: 0;
+            left: 0;
+            background-color: #111;
+            overflow-x: hidden;
+            transition: 0.5s;
+            padding-top: 60px;
+        }
+
+        .flex-container {
+            display: flex;
+            padding: 10px 0;
+            margin: 0 auto;
+        }
+
+        .sidenav a {
+            padding: 8px 8px 8px 32px;
+            text-decoration: none;
+            font-size: 25px;
+            color: #818181;
+            display: block;
+            transition: 0.3s;
+        }
+
+        .sidenav a:hover {
+            color: #f1f1f1;
+        }
+
+        .sidenav .closebtn {
+            position: absolute;
+            top: 0;
+            right: 25px;
+            font-size: 36px;
+            margin-left: 50px;
+        }
+
+        table, th, td {
+            border: 1px solid black;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 5px;
+            text-align: left;
+        }
+
+        th {
+            background-color:#E8E8E8
+        }
+    </style>
+    <script>
+
+    function filterByRestaurant() {
+        var selectBoxRest = document.getElementById("selectBoxRest");
+        var selectedBoxRestValue = selectBoxRest.options[selectBoxRest.selectedIndex].innerHTML;
+        var table = document.getElementById('historyTable');
+        var count = table.rows.length;
+        var total = 0;
+        for(var i=1; i<count; i++) {
+            table.rows[i].style = "display: table-row;";
+            total += Number(table.rows[i].cells[4].innerHTML);
+        }
+
+        if (selectBoxRest.options[selectBoxRest.selectedIndex].value != "1") {
+            total = 0;
+            for(var i=1; i<count; i++) {
+                if (table.rows[i].cells[0].innerHTML != selectedBoxRestValue) {
+                    table.rows[i].style = "display: none;";
+                }
+                else {
+                    total += Number(table.rows[i].cells[4].innerHTML);
+                }
+            }
+        }
+
+        document.getElementById("total_sum").innerHTML = total;
+    }
+
+    function filter() {
+        var selectBoxDelivery = document.getElementById("selectBoxDelivery");
+        var selectedBoxDeliveryIndex = selectBoxDelivery.selectedIndex;
+        var selectedBoxDeliveryValue = selectBoxDelivery.options[selectedBoxDeliveryIndex].innerHTML;
+
+        var selectBoxRest = document.getElementById("selectBoxRest");
+        var selectedBoxRestIndex = selectBoxRest.selectedIndex;
+        var selectedBoxRestValue = selectBoxRest.options[selectedBoxRestIndex].innerHTML;
+
+        var table = document.getElementById('historyTable');
+        var count = table.rows.length;
+        var total = 0;
+
+        for(var i=1; i<count; i++) {
+            table.rows[i].style = "display: table-row;";
+            total += Number(table.rows[i].cells[4].innerHTML);
+        }
+
+        if (selectedBoxDeliveryIndex == 0 && selectedBoxRestIndex == 0) {
+            document.getElementById("total_sum").innerHTML = total;
+            return;
+        }
+
+        if (selectedBoxDeliveryIndex != 0 && selectedBoxRestIndex != 0) {
+            total = 0;
+            for(var i=1; i<count; i++) {
+                if (table.rows[i].cells[0].innerHTML == selectedBoxRestValue && table.rows[i].cells[3].innerHTML == selectedBoxDeliveryValue) {
+                    total += Number(table.rows[i].cells[4].innerHTML);
+                }
+                else {
+                    table.rows[i].style = "display: none;";
+                }
+            }
+        }
+        else {
+            if (selectedBoxDeliveryIndex == 0 || selectedBoxRestIndex == 0) {
+                total = 0;
+                for(var i=1; i<count; i++) {
+                    if (table.rows[i].cells[0].innerHTML == selectedBoxRestValue || table.rows[i].cells[3].innerHTML == selectedBoxDeliveryValue) {
+                        total += Number(table.rows[i].cells[4].innerHTML);
+                    }
+                    else {
+                        table.rows[i].style = "display: none;";
+                    }
+                }
+            }
+        }
+
+        document.getElementById("total_sum").innerHTML = total;
+    }
+
+    function openNav() {
+        document.getElementById("mySidenav").style.width = "250px";
+    }
+
+    function closeNav() {
+        document.getElementById("mySidenav").style.width = "0";
+    }
+    </script>
+</head>
+<body>
+
+<div id="mySidenav" class="sidenav">
+  <a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+  <a href="{% url 'tomilovSite' %}">Заказы</a>
+  <a href="{% url 'tomilovSiteHistory' %}">История</a>
+</div>
+
+<span style="font-size:30px;cursor:pointer" onclick="openNav()">&#9776; Меню</span>
+
+<div class="flex-container">
+    <p>Общая сумма: </p>
+    <p id="total_sum"></p>
+</div>
+
+<select id="selectBoxRest" onchange="filter();">
+    <option value="1">Все точки</option>
+    <option value="2">Мозаика</option>
+    <option value="3">Кунцево</option>
+</select>
+
+<select id="selectBoxDelivery" onchange="filter();">
+    <option value="1">Все типы доставки</option>
+    <option value="2">Доставка Яндекса</option>
+    <option value="3">Доставка ресторана</option>
+    <option value="4">Самовывоз</option>
+</select>
+
+<table id="historyTable" style="width:100%">
+    <tr>
+        <th>Точка</th>
+        <th>Канал</th>
+        <th>Номер заказа</th>
+        <th>Адрес клиента</th>
+        <th>Сумма</th>
+        <th>Клиент</th>
+        <th>Статус</th>
+        <th>Дата</th>
+    </tr>
+    {% for block in blocks %}
+    <tr>
+        <td>{{ block.rest }}</td>
+        <td>{{ block.channel }}</td>
+        <td><a href="{{ block.urlID }}" target="_blank">{{ block.id }}</a></td>
+        <td>{{ block.client_address }}</td>
+        <td>{{ block.total }}</td>
+        <td>{{ block.client }}</td>
+        <td>{{ block.status }}</td>
+        <td>{{ block.date }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+</body>
+</html>
