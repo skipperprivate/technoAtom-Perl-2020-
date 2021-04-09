@@ -1,0 +1,148 @@
+import csv
+import os
+import re
+
+def getActualOrders():
+    info = []
+    with open('actualOrders.csv', newline='') as file:
+        reader = csv.reader(file, delimiter=";")
+        for row in reader:
+            info1 = {'channel': row[0],
+                     'id': row[1],
+                     'urlID': row[2],
+                     'total': row[3],
+                     'client': row[4],
+                     'client_address': row[5],
+                     'status': row[10],
+                     'rest_address': row[11],
+                     'lat': row[12],
+                     'long': row[13]
+                     }
+            info.append(info1)
+    return info
+
+def cleanOldData():
+    __cleanActualOrders()
+    #__cleanMBronDataIfExists()
+
+def __cleanMBronDataIfExists():
+    if os.path.exists("Заказы - Система «M-Bron».csv"):
+        os.remove("Заказы - Система «M-Bron».csv")
+
+def __cleanActualOrders():
+    if os.path.exists("actualOrders.csv"):
+        os.remove("actualOrders.csv")
+
+def cleanHistoryOrders():
+    if os.path.exists("history.csv"):
+        os.remove("history.csv")
+
+def getOrderInfo(orderId):
+    orderInfo = []
+    with open('actualOrders.csv', newline='') as file:
+        reader = csv.reader(file, delimiter=";")
+        for row in reader:
+            if row[1] == orderId:
+                orderInfo = row
+                break
+
+    return orderInfo
+
+def getOrderInfoForApi1(orderId):
+    orderInfo = []
+    with open('actualOrders.csv', newline='') as file:
+        reader = csv.reader(file, delimiter=";")
+        for row in reader:
+            if row[1] == orderId:
+                orderInfo = row
+                break
+
+    return orderInfo
+
+def getActualOrdersForApi():
+    info = []
+    with open('actualOrders.csv', newline='') as file:
+        reader = csv.reader(file, delimiter=";")
+        for row in reader:
+            info1 = {"id": row[1],
+                     "client": row[4],
+                     "client_address": row[5],
+                     "status": row[10]}
+            info.append(info1)
+    return info
+
+def getActualOrderInfoForApi(orderId):
+    info = []
+    with open('actualOrders.csv', newline='') as file:
+        reader = csv.reader(file, delimiter=";")
+        for row in reader:
+            if row[1] == orderId:
+                info1 = {"channel": row[0],
+                        "id": row[1],
+                        "urlID": row[2],
+                        "total": row[3],
+                        "client": row[4],
+                        "client_address": row[5],
+                         "Entrance": row[6],
+                         "Intercom": row[7],
+                         "Floor": row[8],
+                         "Flat": row[9],
+                        "status": row[10]}
+                info.append(info1)
+                break
+    return info
+
+from datetime import datetime, timedelta
+
+def getHistoryOrdersInfo(period):
+    i1 = int(period)
+    day = datetime.now() - timedelta(days=i1)
+    date = str(day.year) + "-" + str(day.month) + "-" + str(day.day)
+    info = []
+    with open('history.csv', newline='') as file:
+        reader = csv.reader(file, delimiter=";")
+        i = 0
+        dates = date.split('-')
+        gottedDate = datetime(int(dates[0]), int(dates[1]), int(dates[2]))
+        for row in reader:
+            orderDates = row[7].split('-')
+            orderDate = datetime(int(orderDates[0]), int(orderDates[1]), int(orderDates[2]))
+            if gottedDate <= orderDate:
+                numbers = re.findall(r'\d+', str(row[3]))
+                if i % 2 == 0:
+                    info1 = {"rest": "",
+                             "channel": row[0],
+                             "id": row[1],
+                             "urlID": row[2],
+                             "total": str(numbers[0]),
+                             "client": row[4],
+                             "client_address": row[5],
+                             "status": row[6],
+                             "date": row[7]}
+                else:
+                    info1 = {"rest": "",
+                             "channel": row[0],
+                             "id": row[1],
+                             "urlID": row[2],
+                             "total": str(numbers[0]),
+                             "client": row[4],
+                             "client_address": row[5],
+                             "status": row[6],
+                             "date": row[7]}
+                info.append(info1)
+            else:
+                break
+            i += 1
+    return info
+
+def getClientCoordinates(orderId):
+    orderInfo = []
+    with open('actualOrders.csv', newline='') as file:
+        reader = csv.reader(file, delimiter=";")
+        for row in reader:
+            if row[1] == orderId:
+                orderInfo.append(row[12])
+                orderInfo.append(row[13])
+                break
+
+    return orderInfo
